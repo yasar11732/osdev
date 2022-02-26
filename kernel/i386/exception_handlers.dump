@@ -1,0 +1,113 @@
+
+exception_handlers.o:     elf32-i386 dosya biçemi
+
+
+Disassembly of section .text:
+
+00000000 <exception_divide_error>:
+   0:	68 00 00 00 00       	push   $0x0
+   5:	e9 99 00 00 00       	jmp    a3 <halt_forever>
+   a:	66 90                	xchg   %ax,%ax
+
+0000000c <exception_debug_exception>:
+   c:	cf                   	iret   
+   d:	8d 76 00             	lea    0x0(%esi),%esi
+
+00000010 <exception_nmi_interrupt>:
+  10:	68 1d 00 00 00       	push   $0x1d
+  15:	e9 89 00 00 00       	jmp    a3 <halt_forever>
+  1a:	66 90                	xchg   %ax,%ax
+
+0000001c <exception_breakpoint>:
+  1c:	cf                   	iret   
+  1d:	8d 76 00             	lea    0x0(%esi),%esi
+
+00000020 <exception_overflow>:
+  20:	cf                   	iret   
+  21:	8d 76 00             	lea    0x0(%esi),%esi
+
+00000024 <exception_bound>:
+  24:	68 3f 00 00 00       	push   $0x3f
+  29:	eb 78                	jmp    a3 <halt_forever>
+  2b:	90                   	nop
+
+0000002c <exception_invalid_opcode>:
+  2c:	68 54 00 00 00       	push   $0x54
+  31:	eb 70                	jmp    a3 <halt_forever>
+  33:	90                   	nop
+
+00000034 <exception_device_not_available>:
+  34:	68 63 00 00 00       	push   $0x63
+  39:	eb 68                	jmp    a3 <halt_forever>
+  3b:	90                   	nop
+
+0000003c <exception_double_fault>:
+  3c:	68 00 00 00 00       	push   $0x0
+  41:	eb 60                	jmp    a3 <halt_forever>
+  43:	90                   	nop
+
+00000044 <exception_coprocessor_segment_overrun>:
+  44:	68 85 00 00 00       	push   $0x85
+  49:	eb 58                	jmp    a3 <halt_forever>
+  4b:	90                   	nop
+
+0000004c <exception_invalid_tss>:
+  4c:	68 a1 00 00 00       	push   $0xa1
+  51:	eb 50                	jmp    a3 <halt_forever>
+  53:	90                   	nop
+
+00000054 <exception_segment_not_present>:
+  54:	68 ad 00 00 00       	push   $0xad
+  59:	eb 48                	jmp    a3 <halt_forever>
+  5b:	90                   	nop
+
+0000005c <exception_stack_segment_fault>:
+  5c:	68 c1 00 00 00       	push   $0xc1
+  61:	eb 40                	jmp    a3 <halt_forever>
+  63:	90                   	nop
+
+00000064 <exception_general_protection>:
+  64:	68 d5 00 00 00       	push   $0xd5
+  69:	eb 38                	jmp    a3 <halt_forever>
+  6b:	90                   	nop
+
+0000006c <exception_page_fault>:
+  6c:	68 e8 00 00 00       	push   $0xe8
+  71:	eb 30                	jmp    a3 <halt_forever>
+  73:	90                   	nop
+
+00000074 <exception_math_fault>:
+  74:	68 f3 00 00 00       	push   $0xf3
+  79:	eb 28                	jmp    a3 <halt_forever>
+  7b:	90                   	nop
+
+0000007c <exception_alignment_check>:
+  7c:	68 fe 00 00 00       	push   $0xfe
+  81:	eb 20                	jmp    a3 <halt_forever>
+  83:	90                   	nop
+
+00000084 <exception_machine_check>:
+  84:	68 0e 01 00 00       	push   $0x10e
+  89:	eb 18                	jmp    a3 <halt_forever>
+  8b:	90                   	nop
+
+0000008c <exception_simd_exception>:
+  8c:	68 1c 01 00 00       	push   $0x11c
+  91:	eb 10                	jmp    a3 <halt_forever>
+  93:	90                   	nop
+
+00000094 <exception_virtualization_exception>:
+  94:	68 2b 01 00 00       	push   $0x12b
+  99:	eb 08                	jmp    a3 <halt_forever>
+  9b:	90                   	nop
+
+0000009c <exception_control_protection_exception>:
+  9c:	68 44 01 00 00       	push   $0x144
+  a1:	eb 00                	jmp    a3 <halt_forever>
+
+000000a3 <halt_forever>:
+  a3:	e8 fc ff ff ff       	call   a4 <halt_forever+0x1>
+
+000000a8 <null_exception_handler>:
+  a8:	fa                   	cli    
+  a9:	f4                   	hlt    
