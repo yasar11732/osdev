@@ -6,16 +6,25 @@
 #error "Need to use ix86-elf compiler"
 #endif
 
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <kernel/tty.h>
-
 #include "multiboot.h"
 #include "i386/interrupt.h"
-#include "i386/boot.h"
+#include "i386/io.h"
+#include "com.h"
+#include "PIC.h"
+#include "page_frame_allocator.h"
+#include "heap.h"
+#include "i386/pci.h"
+
+volatile size_t ticks = 0;
+
+
+
 
 char *memtypes[] = {"","Available","Reserved","Acpi Reclaimable","NVS","Bad Ram"};
 
@@ -23,29 +32,8 @@ __attribute__((aligned(0x10))) static idt_entry_t idt[IDT_MAX_DESCRIPTORS];
 
 static idtr_t idtr;
 
-void PIC_initialize(int master_offset, int slave_offset)
-{
-    
-}
-
 void kernel_main(uint32_t magic, multiboot_info_t *multiboot_info) {
-
-    //disable PIC's until we are ready to initialize
-    outb(0xa1, 0xff);
-    outb(0x21, 0xff);
-
-    unsigned int i;
-
-    terminal_initialize();
-
-    idt_initialize(idt);
-    idt_init_exception_handlers(idt);
-
-    idtr.limit = sizeof(idt) - 1;
-    idtr.base = (uint32_t)(&idt[0]);
-    
-    __asm__ volatile ("lidt %0" : : "m"(idtr)); // load the new IDT
-    __asm__ volatile ("sti"); // set the interrupt flag
+    unsigned long i;
 
     if(magic != 0x2BADB002) {
         printf("Must be loaded from multiboot loader.\r\n");
@@ -57,30 +45,47 @@ void kernel_main(uint32_t magic, multiboot_info_t *multiboot_info) {
         return;
     }
 
+    // init PIT
+    outb(0x43, 0b00110100); // BCD - Rate Generator - lobyte/hibyte - Channel 0
+
+    // 0x38D7 -> 82HZ
+    outb(0x40, 0xD7);
+    outb(0x40, 0x38);
+
+    // remap PIC1 to 0x20 PIC2 to 0x28
+    PIC_remap(0x20,0x28);
+
+    terminal_initialize();
+
+    idt_initialize(idt);
+    idt_init_exception_handlers(idt);
+    idt_init_interrupt_handlers(idt);
+
+    idtr.limit = sizeof(idt) - 1;
+    idtr.base = (uint32_t)(&idt[0]);
+    
+    __asm__ volatile ("lidt %0" : : "m"(idtr)); // load the new IDT
+    __asm__ volatile ("sti"); // set the interrupt flag
+
+    init_serial(COM1, 3);
+
     printf("MEMORY MAP\n");
 
-    multiboot_memory_map_t *mmm = (multiboot_memory_map_t *)multiboot_info->mmap_addr;
-    for(i = 0; i < (multiboot_info->mmap_length / sizeof(multiboot_memory_map_t));i++)
+
+    multiboot_memory_map_t *mmm = multiboot_info->mmap_addr + 0xC0000000;
+    unsigned long num_mmap_entries = multiboot_info->mmap_length / sizeof(multiboot_memory_map_t);
+
+    /*
+    for(i = 0; i < num_mmap_entries; i++)
     {
-        uint32_t start = mmm[i].addr_low;
-        uint32_t end = start + mmm[i].len_low - 1;
+            unsigned long start = mmm[i].addr_low;
+            unsigned long len   = mmm[i].len_low;
 
-        printf("        %X - %X: %s\n",
-        start, end,
-        memtypes[mmm[i].type]);
+            printf("%X-%X: Type %d\n", start, start+len-1, mmm[i].type);
+    }*/
 
-        if(mmm[i].type == MULTIBOOT_MEMORY_AVAILABLE)
-        {
-            size_t gigs = mmm[i].len_low;
-            size_t bytes = gigs & 0x3FF;
-            gigs >>= 10;
-            size_t kbytes = gigs & 0x3FF;
-            gigs >>= 10;
-            size_t mbytes = gigs & 0x3FF;
-            gigs >>=10;
-
-            printf("%d, %d GB - %d MB - %d KB - %d B\n", mmm[i].len_low, gigs, mbytes, kbytes, bytes);
-        }
-    }
+    init_page_frame_allocator(mmm, num_mmap_entries);
+    init_heap();
+    listPCI();
     return;
 }

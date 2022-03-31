@@ -17,6 +17,22 @@ typedef struct {
     uint32_t base;
 } __attribute__((packed)) idtr_t;
 
+void exception_handler(
+    unsigned long exc_no,
+    unsigned long edi,
+    unsigned long esi,
+    unsigned long ebp,
+    unsigned long esp,
+    unsigned long ebx,
+    unsigned long edx,
+    unsigned long ecx,
+    unsigned long eax,
+    unsigned long err_code,
+    unsigned long eip,
+    unsigned long cs,
+    unsigned long eflags
+) __attribute__ ((noreturn));
+
 void exception_divide_error();
 void exception_debug_exception();
 void exception_nmi_interrupt();
@@ -49,5 +65,26 @@ void idt_init_exception_handlers(idt_entry_t *idt);
 #define INVALID_GATE 0x0
 
 #define IDT_MAX_DESCRIPTORS 256
+
+void isr_wrapper0();
+void isr_wrapper1();
+void isr_wrapper2();
+void isr_wrapper3();
+void isr_wrapper4();
+void isr_wrapper5();
+void isr_wrapper6();
+void isr_wrapper7();
+void isr_wrapper8();
+void isr_wrapper9();
+void isr_wrapper10();
+void isr_wrapper11();
+void isr_wrapper12();
+void isr_wrapper13();
+void isr_wrapper14();
+void isr_wrapper15();
+
+void isr_handler(int irq);
+
+void idt_init_interrupt_handlers(idt_entry_t *idt);
 
 #endif

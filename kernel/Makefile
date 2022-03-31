@@ -16,17 +16,22 @@ include $(HOSTARCH)/make.config
 
 CC:=$(CC) --sysroot=$(SYSROOT) -isystem=$(INCLUDEDIR)
 
-CFLAGS=-g -O2 -ffreestanding -Wall -Wextra $(KERNEL_ARCH_CFLAGS)
+CFLAGS=-g -O2 -ffreestanding -Wall $(KERNEL_ARCH_CFLAGS)
 CPPFLAGS=-D__is_kernel -Iinclude $(KERNEL_ARCH_CPPFLAGS)
 LDFLAGS=$(KERNEL_ARCH_LDFLAGS)
 LIBS=-nostdlib -lk -lgcc $(KERNEL_ARCH_LIBS)
 
 KERNEL_OBJS= \
 $(KERNEL_ARCH_OBJS) \
-kernel.o
+kernel.o \
+com.o \
+PIC.o \
+page_frame_allocator.o \
+heap.o \
+page.o \
 
-OBJS=$(HOSTARCH)/crti.o $(HOSTARCH)/crtbegin.o $(KERNEL_OBJS) $(HOSTARCH)/crtend.o $(HOSTARCH)/crtn.o
-LINK_LIST=$(LDFLAGS) $(HOSTARCH)/crti.o $(HOSTARCH)/crtbegin.o $(KERNEL_OBJS) $(LIBS) $(HOSTARCH)/crtend.o $(HOSTARCH)/crtn.o
+OBJS= $(KERNEL_OBJS)
+LINK_LIST=$(LDFLAGS) $(KERNEL_OBJS) $(LIBS)
 
 .PHONY: all clean install install-headers install-kernel
 .SUFFIXES: .o .c .s
@@ -36,9 +41,6 @@ all: kernel.bin
 kernel.bin: $(OBJS) $(HOSTARCH)/linker.ld
 	$(CC) -T $(HOSTARCH)/linker.ld -o $@ $(CFLAGS) $(LINK_LIST)
 	grub-file --is-x86-multiboot $@
-
-$(HOSTARCH)/crtbegin.o $(HOSTARCH)/crtend.o:
-	OBJ=`$(CC) $(CFLAGS) $(LDFLAGS) -print-file-name=$(@F)` && cp "$$OBJ" $@
 
 .c.o:
 	$(CC) -MD -c $< -o $@ -std=gnu99 $(CFLAGS) $(CPPFLAGS)

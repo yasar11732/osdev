@@ -4,5 +4,6 @@
 
 int putchar(int);
 int printf(const char * restrict format, ...);
+int sprintf(char *restrict s, const char *restrict format, ...);
 
 #endif

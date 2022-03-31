@@ -17,11 +17,14 @@ include $(HOSTARCH)/make.config
 
 CC:=$(CC) --sysroot=$(SYSROOT) -isystem=$(INCLUDEDIR)
 
-CFLAGS=-g -O2 -ffreestanding -Wall -Wextra
+CFLAGS=-g -O2 -ffreestanding -Wall -Wextra -Werror
 CPPFLAGS=-D__is_libc -Iinclude
 LIBKCPPFLAGS=-D__is_libk -Iinclude
 
-OBJS=string/strlen.o stdio/putchar.o stdio/printf.o
+OBJS=string/strlen.o string/memcpy.o string/strcpy.o stdio/putchar.o stdio/printf.o \
+string/memcmp.o string/memset.o stdlib/abort.o \
+
+
 LIBK_OBJS=$(OBJS:.o=.libk.o)
 
 BINARIES=libk.a
