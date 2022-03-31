@@ -1,0 +1,1 @@
+cmd.exe START /D C:\Users\yasar\osdev -c "qemu-system-i386.exe -accel tcg,thread=single -cpu core2duo -m 2048 -no-reboot  -drive format=raw,media=cdrom,file=myos.iso -serial stdio -smp 1 -usb -vga std" 

@@ -1,2 +1,13 @@
 *.o
 *.d
+*.lnk
+*.data
+*.dd
+*.img
+*.data
+*.dump
+*.dmp
+.vs/
+.vscode/
+*.log
+*.iso
