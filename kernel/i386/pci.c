@@ -4,29 +4,19 @@
 #include "pci.h"
 #include "io.h"
 #include "../heap.h"
+#include "../dynamic_array.h"
 
-static const char const *pciClasses[] = {
-    "Unclassified",
-    "Mass Storage Controller",
-    "Network Controller",
-    "Display Controller",
-    "Multimedia Controller",
-    "Memory Controller",
-    "Bridge",
-    "Simple Communication Controller",
-    "Base System Peripheral",
-    "Input Device Controller",
-    "Docking Station",
-    "Processor",
-    "Serial Bus Controller",
-    "Wireless Controller",
-    "Intelligent Controller",
-    "Satellite Communication Controller",
-    "Encryption Controller",
-    "Signal Processing Controller",
-    "Processing Accelerator",
-    "Non Essential Instrumentation",
-};
+
+
+static d_array_t *devices = NULL;
+
+typedef struct {
+    uint32_t bus;
+    uint32_t slot;
+    uint32_t function;
+    pci_header_common_t header;
+} pci_device_info_t;
+
 static uint32_t pci_address(uint32_t bus, uint32_t slot, uint32_t func, uint32_t offset)
 {
     return (bus << 16) | (slot << 11) | (func << 8) | (offset & 0XFC) | 0x80000000; 
@@ -49,15 +39,24 @@ static uint16_t pciConfigReadb(uint8_t bus, uint8_t slot, uint8_t func, uint8_t 
     return 0xFF & (pciConfigReadl(bus, slot, func, offset) >> (offset & 3 * 8));
 }
 
-static pci_header_common_t *readCommonHeader(uint8_t bus, uint8_t device, uint8_t func)
+static pci_header_common_t *readCommonHeader(pci_header_common_t *dest, uint8_t bus, uint8_t device, uint8_t func)
 {
     int i;
-    uint32_t *hdr = kmalloc(sizeof(pci_header_common_t));
+    uint32_t *_dest = (uint32_t*)dest;
     for(i = 0; i < sizeof(pci_header_common_t) / 4; i++)
     {
-        hdr[i] = pciConfigReadl(bus, device, func, i*4);
+        _dest[i] = pciConfigReadl(bus, device, func, i*4);
     }
-    return (pci_header_common_t *)hdr;
+    return dest;
+}
+
+static inline pci_header_common_t *read_device_header(uint32_t bus, uint32_t device, uint32_t func)
+{
+    pci_device_info_t *i = d_array_get_first_free(devices);
+    i->bus = bus;
+    i->slot = device;
+    i->function = func;
+    return readCommonHeader(&i->header, bus, device,func);
 }
 
 static void checkDevice(uint8_t device, uint8_t bus);
@@ -71,66 +70,20 @@ static void checkBus(uint8_t bus) {
 
 static void checkFunction(uint8_t bus, uint8_t device, uint8_t func, pci_header_common_t *h)
 {
-    char *subclassName = kmalloc(256);
-    sprintf(subclassName, "%d", h->subClass);
-
-    char *className = "Unknown/Invalid";
-    if(h->class < 0x14)
-        className = pciClasses[h->class];
-    
-    if(h->class == 0x40)
-        className = "Co-Processor";
-
-    if(h->class == PCI_MASS_STORAGE_CTRL) {
-        switch(h->subClass) {
-            case PCI_SCSI_BUS_CTRL:
-                strcpy(subclassName, "SCSI Bus Controller");
-            break;
-            case PCI_IDE_CTRL:
-                strcpy(subclassName, "IDE Controller");
-            break;
-            case PCI_FLOPPY_DISK_CTRL:
-                strcpy(subclassName, "Floppy Disk Controller");
-            break;
-            case PCI_IPI_BUS_CTRL:
-                strcpy(subclassName, "IPI Bus Controller");
-            break;
-            case PCI_RAID_CTRL:
-                strcpy(subclassName, "RAID Controller");
-            break;
-            case PCI_ATA_CTRL:
-                strcpy(subclassName, "ATA Controller");
-            break;
-            case PCI_SATA_CTRL:
-                strcpy(subclassName, "SATA Controller");
-            break;
-            case PCI_SERIAL_SCSI_CTRL:
-                strcpy(subclassName, "Serial SCSI Bus Controller");
-            break;
-            case PCI_NON_VOLATILE_MEM_CTRL:
-                strcpy(subclassName, "NVM Controller");
-            break;
-            default:
-                strcpy(subclassName, "Unknown Mass Storage Subclass");
-        }
-
-    }
-    printf("%d.%d: Class: %s SubClass %s (Interface: %X) (%X-%X)\n", bus, device, className, subclassName, h->progIf, h->vendorId, h->deviceId);
     if(h->class == 0x6 && h->subClass == 0x4) {
         uint8_t secondaryBus = pciConfigReadb(bus, device, func, 0x20);
         checkBus(secondaryBus);
     }
-
-    kfree(subclassName);
 }
 
 static void checkDevice(uint8_t bus, uint8_t device)
 {
+
     uint8_t func = 0;
-    pci_header_common_t *h = readCommonHeader(bus, device, func);
+    pci_header_common_t *h = read_device_header(bus, device, func);
     
-    if(h->deviceId == 0xFFFF) {
-        kfree(h);
+    if(h->vendorId == 0xFFFF) {
+        d_array_pop(devices);
         return;
     }
 
@@ -140,18 +93,64 @@ static void checkDevice(uint8_t bus, uint8_t device)
 
         for(func = 1; func < 8; func++)
         {
-            pci_header_common_t *h2 = readCommonHeader(bus, device, func);
+            pci_header_common_t *h2 = read_device_header(bus, device, func);
 
-            if(h2->deviceId != 0xFFFF)
+            if(h2->vendorId != 0xFFFF) {
                 checkFunction(bus, device, func, h2);
+            } else {
+                d_array_pop(devices);
+            }
+        }
+    }
+}
 
-            kfree(h2);
+
+
+void scanPCI() {
+    if(devices == NULL) {
+        devices = d_array_create(sizeof(pci_device_info_t), 16);
+    } else {
+        d_array_reset(devices);
+    }
+
+    pci_header_common_t *h = read_device_header(0, 0, 0);
+    
+    d_array_pop(devices);
+
+    if((h->headerType & 0x80) == 0) {
+        checkBus(0);
+    } else {
+        uint8_t function;
+        for(function = 0; function < 8; function++) {
+            pci_header_common_t *h2 = read_device_header(0, 0, function);
+            if(h2->vendorId == 0xFFFF) {
+                d_array_pop(devices);
+                break;
+            } else {
+                checkBus(function);
+            }
         }
     }
 
-    kfree(h);
 }
 
 void listPCI() {
-    checkBus(0);
+    if(devices == NULL)
+        scanPCI();
+
+    uint32_t numDevices = d_array_get_item_count(devices);
+    pci_device_info_t *dinfo = d_array_get_first_item(devices);
+    
+    while(numDevices--) {
+        printf("%d.%d.%d - Vendor: %X, DeviceId: %X, Class %X, SubClass %X, Interface %X\n",
+            dinfo[numDevices].bus,
+            dinfo[numDevices].slot,
+            dinfo[numDevices].function,
+            dinfo[numDevices].header.vendorId,
+            dinfo[numDevices].header.deviceId,
+            dinfo[numDevices].header.class,
+            dinfo[numDevices].header.subClass,
+            dinfo[numDevices].header.progIf
+        );
+    }
 }

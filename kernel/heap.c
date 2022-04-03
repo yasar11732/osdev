@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "page_frame_allocator.h"
 #include "page.h"
@@ -40,6 +41,7 @@ unsigned long heapstart;
 
 static inline void WRITE_FOOTER(chunk_t *p)
 {
+
     uint32_t size = p->size & SIZEMASK;
     uint32_t *footer = (uint32_t*)(&p->next);
     footer += (size / sizeof(uint32_t));
@@ -118,9 +120,27 @@ void init_heap()
     WRITE_FOOTER(freelist);
 }
 
+static inline void listChunks()
+{
+    // chunk_t *c = heapstart;
+    // printf("Listing Chunks\n");
+    // while(c < heapend) {
+    //     chunk_t *next = FIND_ADJ_NEXT(c);
+
+    //     printf("%X-%X\n", c, next);
+
+    //     c = next;
+    // }
+}
+
 static chunk_t *grow_heap(uint32_t size)
 {
+
+    listChunks();
     uint32_t i;
+
+
+
     size += OVERHEAD;
     size += (-size) % 4096;
     chunk_t *c = heapend;
@@ -201,8 +221,27 @@ void *kmalloc(uint32_t size)
     }
 
 
-    
+    listChunks();
     return &search->next;
+}
+
+// This is a stupid placeholder
+// realloc function, normally
+// we should grow or shrink chunks
+// if possible without moving data
+void *krealloc(void *p, uint32_t size)
+{
+    if(!p)
+        return;
+
+    chunk_t *c = (chunk_t *)((uint32_t)p - sizeof(uint32_t));
+    
+    uint32_t oldsize = c->size & SIZEMASK;
+
+    void *p2 = kmalloc(size);
+    memcpy(p2, p, oldsize >= size ? size : oldsize);
+    kfree(p);
+    return p2;
 }
 
 void kfree(void *p)
@@ -215,7 +254,8 @@ void kfree(void *p)
     chunk_t *c = (chunk_t *)((uint32_t)p - sizeof(uint32_t));
     c->size &= ~CHUNK_USED;
     chunk_t *next = FIND_ADJ_NEXT(c);
-    next->size &= ~PREV_USED;
+    if(next < heapend)
+        next->size &= ~PREV_USED;
 
     if(! (c->size & PREV_USED)) {
         // if prev chunk is free
@@ -230,5 +270,6 @@ void kfree(void *p)
         freelist = c;
     }
 
+    listChunks();
 }
 

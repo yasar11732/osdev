@@ -1,10 +1,11 @@
 *.o
+*.bin
+*.a
 *.d
 *.lnk
 *.data
 *.dd
 *.img
-*.data
 *.dump
 *.dmp
 .vs/
