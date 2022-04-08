@@ -122,21 +122,27 @@ void init_heap()
 
 static inline void listChunks()
 {
-    // chunk_t *c = heapstart;
-    // printf("Listing Chunks\n");
-    // while(c < heapend) {
-    //     chunk_t *next = FIND_ADJ_NEXT(c);
+    char *chunk_types[] = {
+        "CHUNK FREE, PREV FREE",
+        "CHUNK USED, PREV FREE",
+        "CHUNK FREE, PREV USED",
+        "CHUNK USED, PREV USED"
+    };
 
-    //     printf("%X-%X\n", c, next);
+    chunk_t *c = heapstart;
+    printf("Listing Chunks\n");
+    while(c < heapend) {
+        chunk_t *next = FIND_ADJ_NEXT(c);
 
-    //     c = next;
-    // }
+        printf("%X-%X (%d bytes, %s)\n", c, next, c->size & SIZEMASK, chunk_types[(c->size) & 7]);
+
+        c = next;
+    }
 }
 
 static chunk_t *grow_heap(uint32_t size)
 {
 
-    listChunks();
     uint32_t i;
 
 
@@ -163,6 +169,8 @@ static chunk_t *grow_heap(uint32_t size)
         c->next = 0;
         WRITE_FOOTER(c);
         c->size |= PREV_USED;
+        c->next = freelist;
+        freelist = c;
         return c;
     } else {
         prev->size += size;
@@ -173,7 +181,7 @@ static chunk_t *grow_heap(uint32_t size)
 
 void *kmalloc(uint32_t size)
 {
-
+    printf("Kmalloc called with %d\n", size);
 
     if(!size)
         return 0;
@@ -181,17 +189,16 @@ void *kmalloc(uint32_t size)
     size += (-size) % 8;
 
     chunk_t *search;
-    chunk_t *prev;
+    chunk_t **p;
 
-    for(prev = 0, search = freelist;
+    for(search = freelist;
         search && search->size < size;
-        prev = search, search = search->next)
+        search = search->next)
         ; /* first chunk that is big enough */
     
     if(search == 0) {
         // there is no usable chunk that is large enough
-        chunk_t *new = grow_heap(size);
-        return &new->next;
+        search = grow_heap(size);
     }
 
     if(size < search->size - OVERHEAD - MIN_CHUNK)
@@ -213,13 +220,13 @@ void *kmalloc(uint32_t size)
     if(adj < heapend) {
         adj->size |= PREV_USED;
     }
-    
-    if(prev == 0) {
-        freelist = search->next;
-    } else {
-        prev->next = search->next;
-    }
 
+    // p should point to pointer that points to search
+    p = &freelist;
+    while(*p != search)
+        p = &((*p)->next);
+    
+    *p = (*p)->next;
 
     listChunks();
     return &search->next;

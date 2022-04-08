@@ -30,7 +30,8 @@ page_frame_allocator.o \
 heap.o \
 page.o \
 dynamic_array.o \
-
+sched.o \
+switch_task.o \
 
 OBJS= $(KERNEL_OBJS)
 LINK_LIST=$(LDFLAGS) $(KERNEL_OBJS) $(LIBS)

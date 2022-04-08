@@ -20,17 +20,83 @@
 #include "page_frame_allocator.h"
 #include "heap.h"
 #include "i386/pci.h"
+#include "sched.h"
+#include "i386/io.h"
 
 volatile size_t ticks = 0;
-
-
-
-
-char *memtypes[] = {"","Available","Reserved","Acpi Reclaimable","NVS","Bad Ram"};
 
 __attribute__((aligned(0x10))) static idt_entry_t idt[IDT_MAX_DESCRIPTORS];
 
 static idtr_t idtr;
+
+typedef struct {
+    uint32_t low;
+    uint32_t high;
+} myuint64_t;
+
+static inline uint32_t read_counter() {
+    uint32_t low;
+    uint32_t high;
+    __asm__ __volatile__("rdtsc" : "=eax"(low), "=edx"(high) : :);
+    return (high << 16) | (low >> 16) ;
+}
+
+static void diff64(myuint64_t *r, myuint64_t *op1, myuint64_t *op2)
+{
+    int carry;
+    uint32_t d1, d2;
+
+    // destination and source can be
+    // the same, so this is needed
+    d1 = op1->low;
+    d2 = op2->low;
+    carry = d1<d2;
+
+    r->low = d1-d2;
+    d1 = op1->high;
+    d2 = op2->high;
+
+    r->high = d1-d2;
+
+}
+
+static void task_a_proc(void) {
+
+    size_t next_print = ticks+100;
+    while(1) {
+        __asm__ __volatile__("hlt");
+        if(ticks > next_print) {
+            printf("task_a: %d\n", read_counter());
+            next_print = ticks+100;
+        }
+        schedule();
+    }
+
+}
+
+static void task_b_proc(void) {
+    size_t next_print = ticks+150;
+    while(1) {
+        __asm__ __volatile__("hlt");
+        if(ticks > next_print) {
+            printf("task_b: %d\n", read_counter());
+            next_print = ticks+150;
+        }
+        schedule();
+    }
+}
+
+// static void task_c_proc(void) {
+//     size_t next_print = ticks+25;
+//     while(1) {
+//         __asm__ __volatile__("hlt");
+//         if(ticks > next_print) {
+//             printf("task_c:\n");
+//             next_print = ticks+25;
+//         }
+//         schedule();
+//     }
+// }
 
 void kernel_main(uint32_t magic, multiboot_info_t *multiboot_info) {
     unsigned long i;
@@ -75,17 +141,16 @@ void kernel_main(uint32_t magic, multiboot_info_t *multiboot_info) {
     multiboot_memory_map_t *mmm = multiboot_info->mmap_addr + 0xC0000000;
     unsigned long num_mmap_entries = multiboot_info->mmap_length / sizeof(multiboot_memory_map_t);
 
-    /*
-    for(i = 0; i < num_mmap_entries; i++)
-    {
-            unsigned long start = mmm[i].addr_low;
-            unsigned long len   = mmm[i].len_low;
-
-            printf("%X-%X: Type %d\n", start, start+len-1, mmm[i].type);
-    }*/
-
     init_page_frame_allocator(mmm, num_mmap_entries);
     init_heap();
-    listPCI();
+    // listPCI();
+    initialize_multitasking();
+    new_task(task_a_proc);
+    new_task(task_b_proc);
+    // new_task(task_c_proc);
+    while(1) {
+        __asm__ __volatile__("hlt");
+        schedule();
+    }
     return;
 }
